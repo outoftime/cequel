@@ -1,4 +1,5 @@
 require File.expand_path('../../environment', __FILE__)
+require 'cequel/model'
 
 Dir.glob(File.expand_path('../../support/**/*.rb', __FILE__)).each do |file|
   require file
@@ -9,6 +10,7 @@ end
 
 RSpec.configure do |config|
   config.include(Cequel::SpecSupport::Helpers)
+  config.extend(Cequel::SpecSupport::Macros)
 
   config.before(:all) do
     connection = CassandraCQL::Database.new(
@@ -20,6 +22,7 @@ RSpec.configure do |config|
       CREATE KEYSPACE #{keyspace}
       WITH REPLICATION = {'class': 'SimpleStrategy', 'replication_factor': 1}
     CQL
+    Cequel::Model::Base.connection = cequel
   end
 
   config.after(:all) do

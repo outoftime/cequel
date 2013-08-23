@@ -49,7 +49,17 @@ end
 namespace :bundle do
   desc 'Run bundler for all environments'
   task :all do
-    abort unless system('rvm', '1.9,2.0', 'do', 'rake', 'appraisal:install')
+    abort unless system('rvm', '2.0,1.9,rbx-d19', 'do', 'bundle')
+    abort unless system('rvm', '2.0,1.9,rbx-d19', 'do', 'rake', 'appraisal:install')
+  end
+
+  desc 'Update to latest dependencies on all environments'
+  task :update_all do
+    gemfiles = File.expand_path("../gemfiles", __FILE__)
+    FileUtils.rm_r(gemfiles, :verbose => true) if File.exist?(gemfiles)
+    abort unless system('bundle', 'update')
+    abort unless system('rvm', '2.0,1.9,rbx-d19', 'do', 'bundle', 'install')
+    abort unless system('rvm', '2.0,1.9,rbx-d19', 'do', 'rake', 'appraisal:install')
   end
 end
 
@@ -64,7 +74,7 @@ end
 
 namespace :test do
   task :all do
-    abort unless system('rvm', '1.9,2.0', 'do',
+    abort unless system('rvm', '2.0,1.9,rbx-d19', 'do',
                         'bundle', 'exec',
                         'rake', 'appraisal', 'test:concise')
   end
