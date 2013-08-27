@@ -92,6 +92,13 @@ module Cequel
 
       end
 
+      def ==(record)
+        return false unless self.class == record.class
+        return super if missing_keys? || record.missing_keys?
+        key_attributes.zip(record.key_attributes).
+          all? { |value1, value2| value1 == value2 }
+      end
+
       protected
       delegate :table_schema, :to => 'self.class'
 
@@ -110,6 +117,14 @@ module Cequel
         raise UnknownAttributeError,
           "unknown attribute: #{name}" unless column
         attributes[name] = value.nil? ? nil : column.cast(value)
+      end
+
+      def key_attributes
+        table_schema.key_columns.map { |column| read_attribute(column.name) }
+      end
+
+      def missing_keys?
+        key_attributes.any? { |value| value.nil? }
       end
 
       private

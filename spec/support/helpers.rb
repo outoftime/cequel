@@ -8,8 +8,14 @@ module Cequel
           class_eval(&block)
         end
 
-        let(:model_class) { clazz }
-        let(:mc) { clazz }
+        previous = nil
+        Kernel.module_eval do
+          if const_defined?(class_name)
+            previous = const_get(class_name)
+            remove_const(class_name)
+          end
+          const_set(class_name, clazz)
+        end
 
         if options.fetch(:create_table, true)
           before(:all) { clazz.synchronize_schema }
@@ -21,14 +27,8 @@ module Cequel
           end
         end
 
-        around do |example|
+        after :all do
           Kernel.module_eval do
-            if const_defined?(class_name)
-              previous = const_get(class_name)
-              remove_const(class_name)
-            end
-            const_set(class_name, clazz)
-            example.run
             remove_const(class_name)
             const_set(class_name, previous) if previous
           end

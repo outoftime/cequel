@@ -6,6 +6,11 @@ module Cequel
 
       extend ActiveSupport::Concern
 
+      included do
+        class_attribute :table_schema_builders
+        self.table_schema_builders = []
+      end
+
       module ClassMethods
 
         def synchronize_schema
@@ -22,6 +27,7 @@ module Cequel
         end
 
         def local_key_column
+          warn "Called local_key_column from #{caller.first}"
           @local_key_column ||= table_schema.key_columns.last
         end
 

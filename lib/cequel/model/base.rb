@@ -4,9 +4,10 @@ module Cequel
 
     class Base
 
-      include Cequel::Model::Properties
       include Cequel::Model::Schema
+      include Cequel::Model::Properties
       include Cequel::Model::Persistence
+      include Cequel::Model::Nesting
       extend Cequel::Model::Scoped
 
       class_attribute :table_name, :connection, :default_attributes,
