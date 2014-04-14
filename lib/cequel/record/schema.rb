@@ -20,7 +20,11 @@ module Cequel
 
       included do
         class_attribute :table_name, instance_writer: false
-        self.table_name = name.tableize.to_sym unless name.nil?
+        class_attribute :counter_table_name, instance_writer: false
+        unless name.nil?
+          self.table_name = name.tableize.to_sym unless name.nil?
+          self.counter_table_name = :"#{table_name.singularize}_counts"
+        end
       end
 
       #
@@ -77,8 +81,14 @@ module Cequel
         # @return [void]
         #
         def synchronize_schema
-          Cequel::Schema::TableSynchronizer
-            .apply(connection, read_schema, table_schema)
+          if has_scalar_table?
+            Cequel::Schema::TableSynchronizer
+              .apply(connection, read_schema, table_schema)
+          end
+          if has_counter_table?
+            Cequel::Schema::TableSynchronizer
+              .apply(connection, read_counter_schema, counter_table_schema)
+          end
         end
 
         #
@@ -93,21 +103,60 @@ module Cequel
         end
 
         #
+        # Read the current state of this record's companion counter table in
+        # Cassandra from the database.
+        #
+        # @return [Schema::Table] the current schema assigned to this record's
+        #   counter table in the database
+        #
+        def read_counter_schema
+          connection.schema.read_table(counter_table_name)
+        end
+
+        #
         # @return [Schema::Table] the schema as defined by the columns
         #   specified in the class definition
         #
         def table_schema
-          @table_schema ||= Cequel::Schema::Table.new(table_name)
+          @table_schema ||= initialize_schema(table_name)
+        end
+
+        def counter_table_schema
+          @counter_table_schema ||= initialize_schema(counter_table_name)
+        end
+
+        def has_scalar_table?
+          table_schema.data_columns.any? || !has_counter_table?
+        end
+
+        def has_counter_table?
+          counter_table_schema.data_columns.any?
+        end
+
+        def each_table_schema
+          return enum_for(:each_table_schema) unless block_given?
+
+          yield table_schema
+          yield counter_table_schema
+        end
+
+        def defined_table_schemas
+          [].tap do |schemas|
+            schemas << table_schema if has_scalar_table?
+            schemas << counter_table_schema if has_counter_table?
+          end
         end
 
         protected
 
         def key(name, type, options = {})
           super
-          if options[:partition]
-            table_schema.add_partition_key(name, type)
-          else
-            table_schema.add_key(name, type, options[:order])
+          each_table_schema do |schema|
+            if options[:partition]
+              schema.add_partition_key(name, type)
+            else
+              schema.add_key(name, type, options[:order])
+            end
           end
         end
 
@@ -131,12 +180,23 @@ module Cequel
           table_schema.add_map(name, key_type, value_type)
         end
 
+        def counter(name)
+          super
+          counter_table_schema.add_data_column(name, :counter)
+        end
+
         def table_property(name, value)
-          table_schema.add_property(name, value)
+          each_table_schema { |schema| schema.add_property(name, value) }
         end
 
         def compact_storage
-          table_schema.compact_storage = true
+          each_table_schema { |schema| schema.compact_storage = true }
+        end
+
+        private
+
+        def initialize_schema(name)
+          Cequel::Schema::Table.new(name)
         end
       end
 

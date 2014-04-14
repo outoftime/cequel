@@ -191,6 +191,22 @@ module Cequel
           set_empty_attribute(name) { {} }
         end
 
+        #
+        # Define a counter column
+        #
+        # @param name [Symbol] the name of the counter column
+        # @return [void]
+        #
+        # @see Record::Counter
+        # @since 1.3.0
+        #
+        # @note Counter columns cannot coexist in a table with regular columns.
+        #   Defining a counter column creates a separate “companion” table that
+        #   is used to store counters.
+        #
+        def counter(name)
+        end
+
         private
 
         def def_accessors(name)
