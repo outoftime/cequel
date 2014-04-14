@@ -17,6 +17,7 @@ module Cequel
               clazz = Class.new do
                 include Cequel::Record
                 self.table_name = name.to_s.tableize
+                self.counter_table_name = "#{name}Count".tableize
                 class_eval(&block)
               end
               Object.module_eval { const_set(name, clazz) }
@@ -46,6 +47,10 @@ module Cequel
 
       def uuid(name)
         let(name) { Cequel.uuid }
+      end
+
+      def pry
+        specify { binding.pry }
       end
     end
 

@@ -41,6 +41,11 @@ module Cequel
           define_attribute_method(name)
           super
         end
+
+        def counter(name, *)
+          define_attribute_method(name)
+          super
+        end
       end
 
       # @private

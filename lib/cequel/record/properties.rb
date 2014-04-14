@@ -44,8 +44,8 @@ module Cequel
         class <<self; alias_method :new_empty, :new; end
         extend ConstructorMethods
 
-        attr_reader :collection_proxies
-        private :collection_proxies
+        attr_reader :attribute_proxies
+        private :attribute_proxies
       end
 
       # @private
@@ -205,6 +205,9 @@ module Cequel
         #   is used to store counters.
         #
         def counter(name)
+          def_counter_accessors(name)
+          set_attribute_default(name, 0)
+          set_empty_attribute(name) { 0 }
         end
 
         private
@@ -235,7 +238,7 @@ module Cequel
         def def_collection_reader(name, collection_proxy_class)
           module_eval <<-RUBY, __FILE__, __LINE__+1
             def #{name}
-              proxy_collection(#{name.inspect}, #{collection_proxy_class})
+              proxy_attribute(#{name.inspect}, #{collection_proxy_class})
             end
           RUBY
         end
@@ -243,8 +246,29 @@ module Cequel
         def def_collection_writer(name)
           module_eval <<-RUBY, __FILE__, __LINE__+1
             def #{name}=(value)
-              reset_collection_proxy(#{name.inspect})
+              reset_attribute_proxy(#{name.inspect})
               write_attribute(#{name.inspect}, value)
+            end
+          RUBY
+        end
+
+        def def_counter_accessors(name)
+          def_counter_reader(name)
+          def_counter_writer(name)
+        end
+
+        def def_counter_reader(name)
+          module_eval <<-RUBY, __FILE__, __LINE__+1
+            def #{name}
+              proxy_attribute(#{name.inspect}, Counter)
+            end
+          RUBY
+        end
+
+        def def_counter_writer(name)
+          module_eval <<-RUBY, __FILE__, __LINE__+1
+            def #{name}=(value)
+              #{name}.update(value)
             end
           RUBY
         end
@@ -261,7 +285,7 @@ module Cequel
       # @private
       def initialize(attributes = {}, record_collection = nil)
         @attributes, @record_collection = attributes, record_collection
-        @collection_proxies = {}
+        @attribute_proxies = {}
       end
 
       #
@@ -363,13 +387,13 @@ module Cequel
 
       private
 
-      def proxy_collection(column_name, proxy_class)
+      def proxy_attribute(column_name, proxy_class)
         column = self.class.reflect_on_column(column_name)
-        collection_proxies[column_name] ||= proxy_class.new(self, column)
+        attribute_proxies[column_name] ||= proxy_class.new(self, column)
       end
 
-      def reset_collection_proxy(name)
-        collection_proxies.delete(name)
+      def reset_attribute_proxy(name)
+        attribute_proxies.delete(name)
       end
 
       def init_attributes(new_attributes)

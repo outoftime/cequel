@@ -52,6 +52,11 @@ module Cequel
         end
 
         # @private
+        def counter_table
+          connection[counter_table_name]
+        end
+
+        # @private
         def hydrate(row)
           new_empty(row).__send__(:hydrated!)
         end
@@ -202,7 +207,8 @@ module Cequel
       def destroy(options = {})
         options.assert_valid_keys(:consistency)
         assert_keys_present!
-        metal_scope.delete(options)
+        metal_scope.delete(options) if self.class.has_scalar_table?
+        counter_metal_scope.delete(options) if self.class.has_counter_table?
         transient!
         self
       end
@@ -256,7 +262,7 @@ module Cequel
       def create(options = {})
         assert_keys_present!
         metal_scope
-          .insert(attributes.reject { |attr, value| value.nil? }, options)
+          .insert(attributes_for_insert, options)
         loaded!
         persisted!
       end
@@ -266,6 +272,7 @@ module Cequel
         connection.batch do
           updater.execute(options)
           deleter.execute(options)
+          incrementer.execute(options)
           @updater, @deleter = nil
         end
       end
@@ -278,10 +285,14 @@ module Cequel
         @deleter ||= Metal::Deleter.new(metal_scope)
       end
 
+      def incrementer
+        @incrementer ||= Metal::Incrementer.new(counter_metal_scope)
+      end
+
       private
 
-      def_delegators 'self.class', :connection, :table
-      private :connection, :table
+      def_delegators 'self.class', :connection, :table, :counter_table
+      private :connection, :table, :counter_table
 
       def read_attribute(attribute)
         super
@@ -302,13 +313,20 @@ module Cequel
                    "Can't update key #{name} on persisted record"
             end
 
-            if value.nil?
-              deleter.delete_columns(name)
-            else
-              updater.set(name => value)
+            if column.type != Type[:counter]
+              if value.nil?
+                deleter.delete_columns(name)
+              else
+                updater.set(name => value)
+              end
             end
           end
         end
+      end
+
+      def attributes_for_insert
+        attributes.slice(*table_schema.column_names)
+          .reject { |attr, value| value.nil? }
       end
 
       def record_collection
@@ -325,12 +343,16 @@ module Cequel
 
       def loaded!
         @loaded = true
-        collection_proxies.each_value { |collection| collection.loaded! }
+        attribute_proxies.each_value { |proxy| proxy.loaded! }
         self
       end
 
       def metal_scope
         table.where(key_attributes)
+      end
+
+      def counter_metal_scope
+        counter_table.where(key_attributes)
       end
 
       def attributes_for_create

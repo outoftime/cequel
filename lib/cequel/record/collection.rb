@@ -1,5 +1,6 @@
 # -*- encoding : utf-8 -*-
 require 'delegate'
+require 'cequel/record/attribute_proxy'
 
 module Cequel
   module Record
@@ -55,97 +56,24 @@ module Cequel
       extend ActiveSupport::Concern
       extend Forwardable
 
-      #
-      # @!method loaded?
-      #   @return [Boolean] `true` if the collection's contents are loaded into
-      #     memory
-      #
-      def_delegators :@model, :loaded?, :updater, :deleter
+      def_delegators :@model, :updater, :deleter
       private :updater, :deleter
 
-      #
-      # @!method column_name
-      #   @return [Symbol] the name of the collection column
-      #
-      def_delegator :@column, :name, :column_name
-
-      def_delegators :__getobj__, :clone, :dup
 
       included do
+        include AttributeProxy
+
         define_method(
           :method_missing,
           BasicObject.instance_method(:method_missing))
         private :method_missing
       end
 
-      #
-      # @param model [Record] record that contains this collection
-      # @param column [Schema::Column] column this collection's data belongs to
-      # @return [Collection] a new collection
-      #
-      def initialize(model, column)
-        @model, @column = model, column
-      end
-
-      #
-      # @return [String] inspected underlying Ruby collection object
-      #
-      def inspect
-        __getobj__.inspect
-      end
-
-      #
-      # Notify the collection that its underlying data is loaded in memory.
-      #
-      # @return [void]
-      #
-      # @api private
-      #
-      def loaded!
-        modifications.each { |modification| modification.call() }.clear
-      end
-
-      #
-      # Notify the collection that its staged changes have been written to the
-      # data store.
-      #
-      # @return [void]
-      #
-      # @api private
-      #
-      def persisted!
-        modifications.clear
-      end
-
-      protected
-
-      def __getobj__
-        model.__send__(:read_attribute, column_name)
-      end
-
-      def __setobj__(obj)
-        fail "Attempted to call __setobj__ on read-only delegate!"
-      end
-
       private
 
-      attr_reader :model, :column
       def_delegator :column, :cast, :cast_collection
       def_delegator 'column.type', :cast, :cast_element
       private :cast_collection, :cast_element
-
-      def to_modify(&block)
-        if loaded?
-          model.__send__("#{column_name}_will_change!")
-          block.call()
-        else modifications << block
-        end
-        self
-      end
-
-      def modifications
-        @modifications ||= []
-      end
     end
 
     #

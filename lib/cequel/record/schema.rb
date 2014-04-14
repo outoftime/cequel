@@ -65,11 +65,11 @@ module Cequel
                        :key_column_names, :partition_key_columns,
                        :partition_key_column_names, :clustering_columns,
                        :compact_storage?
-        #
-        # @!method reflect_on_column(name)
-        #   (see Cequel::Schema::Table#column)
-        #
-        def_delegator :table_schema, :column, :reflect_on_column
+
+        # (see Cequel::Schema::Table#column)
+        def reflect_on_column(name)
+          table_schema.column(name) || counter_table_schema.column(name)
+        end
 
         #
         # Read the current schema assigned to this record's table from

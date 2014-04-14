@@ -207,6 +207,13 @@ module Cequel
       end
 
       #
+      # @return [Array<Symbol>] names of all columns (keys and data columns)
+      #
+      def column_names
+        columns.map { |column| column.name }
+      end
+
+      #
       # @return [Array<Symbol>] names of partition key columns
       #
       def partition_key_column_names
